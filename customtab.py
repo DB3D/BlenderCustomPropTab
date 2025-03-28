@@ -9,12 +9,11 @@
 # 1 - Add this file to your add-on folder as a separate module. 
 #     Don't edit the file please, just use the public functions.
 #
-# 2 - Register the `bpy.types.Panel` for the custom tabs:
+# 2 - In your code, create some panels (from bpy.types.Panel)
 #     - Follow the regular `_PT_` panel registration procedure.
 #     - Define `.draw(self, context)` and `.bl_label` as usual.
-#     - Set `.bl_region_type` to `UI`.
-#     - Set `.bl_space_type` to `VIEW_3D`.
-#     - Set `.bl_customtab` to the uniqueid of custom tab, defined later with `append_tab`.
+#     - Regroup all these panels in a list, that you'll pass later to 'append_tab()'
+#     - Nothing else is required to you. Do not use 'bpy.utils.register_class' nor 'unregister_class'.
 #
 # 3 - Implement the `customtab.register()` and `customtab.unregister()` functions in your main `__init__.py`:
 #     - Attach these functions to your main add-on's `register()` and `unregister()` functions, respectively.
@@ -22,8 +21,8 @@
 #
 # 4 - Add your custom tabs using the `customtab.append_tab()` function. For example:
 #     ```
-#     append_tab(uniqueid="SUPERTAB", icon="MONKEY", name="My Monkey Tab", description="Suzanne is King")
-#     append_tab(uniqueid="MYUNIQUENAME", icon="GHOST_ENABLED", name="Ghost Tab")
+#     append_tab(uniqueid="SUPERTAB", icon="MONKEY", name="My Monkey Tab", description="Suzanne is King", panels=panelslistMonkey,)
+#     append_tab(uniqueid="MYUNIQUENAME", icon="GHOST_ENABLED", name="Ghost Tab", panels=panellistGhost,)
 #     ```
 #     - Important: Use a unique `uniqueid` to avoid conflicts with other tools.
 #
@@ -401,6 +400,18 @@ def _append_registry(item):
     _get_registry().append(item)
     return None
 
+def _remove_from_registry(uniqueid):
+    torem = None
+    registry = _get_registry()
+    for d in registry:
+        if (type(d) is dict):
+            if d['id']==uniqueid:
+                torem = d
+                break
+    if torem:
+        registry.remove(torem)
+    return None
+
 def _existing_registry_ids():
     for d in _get_registry():
         if (type(d) is dict):
@@ -503,19 +514,11 @@ def _reg_handlers(regstatus:bool):
 #                          888                                  
 #                         o888o                                 
 
-# NOTE Dear user, please do not monkey-patch yourself! Stick to this system to avoid issues!
-# Monkey-patching is powerful but can break things at runtime if not done properly. 
-# Do not mess with this. If you have a request for a code change, please contact me to discuss it.
-# Collaboration between plugin developers is essential for this technique to be reliable and bug-free.
-
-# NOTE if you are worried: This code does modify Blender's Python code, but only at runtime. It will never
-# break the user's code base once a plugin is uninstalled and Blender has restarted.
-
 ORIGINAL_CLASSES = []
 PATCHED_CLASSES = []
 
 def _reg_tool_impostors(regstatus:bool):
-    """monkey patching the draws of the tool property category.
+    """monkey patching the draw/poll functions of the tool Properties category.
     we chose this section as it is mostly deserted, and unaffected by context"""
 
     childrenreload = False
@@ -531,11 +534,8 @@ def _reg_tool_impostors(regstatus:bool):
 
         cls = getattr(bpy.types,attr)
         
-        #user classes?
-        if hasattr(cls,'bl_customtab'):
-            cls.bl_region_type = 'UI'
-            cls.bl_category = "Tool"
-            classes_to_patch.append(cls)
+        #user classes we skip. separate function for that.
+        if hasattr(cls,'CustTabUniqueID'):
             continue
 
         #ensure the attributes are correct
@@ -567,25 +567,20 @@ def _reg_tool_impostors(regstatus:bool):
 
                 class Patched(ocl):
                     """exact copy of original Panel class, but with tweaked poll behavior"""
-
                     __name__ = ocl.__name__
                     bl_idname = ocl.__name__
 
                     CustTabIsPatched = True
-                    CustTabIsUser = hasattr(ocl,'bl_customtab')
-                    CustTabUserId = ocl.bl_customtab if CustTabIsUser else None
-
                     CustTabIsHeader = ocl.__name__=='VIEW3D_PT_active_tool_duplicate'
                     if CustTabIsHeader:
                         bl_order = 0
 
-                    _original_draw = ocl.draw
-                    _original_poll = ocl.poll if hasattr(ocl,'poll') else None
+                    original_draw = ocl.draw
+                    original_poll = ocl.poll if hasattr(ocl,'poll') else None
 
                     def draw(self, context, *args, **kwargs):
 
                         layout = self.layout
-                        wm = context.window_manager
                         space = context.space_data
 
                         #header of the editor. If tab is custom tool, we draw a custom header
@@ -627,9 +622,8 @@ def _reg_tool_impostors(regstatus:bool):
 
                         #debug data?
                         if (DEBUG_MODE):
-                            text = f"I'm an User Tab for '{self.CustTabUserId}'!" if self.CustTabIsUser else "I'm Patched!"
-                            layout.box().label(text=text, icon="GHOST_ENABLED")
-                        return self._original_draw(context, *args, **kwargs)
+                            layout.box().label(text="I'm Patched!", icon="GHOST_ENABLED")
+                        return self.original_draw(context, *args, **kwargs)
 
                     @classmethod
                     def poll(cls, context, *args, **kwargs):
@@ -639,20 +633,18 @@ def _reg_tool_impostors(regstatus:bool):
 
                         #execute native poll function
                         original_cond = True
-                        if cls._original_poll:
-                            original_cond = cls._original_poll(context, *args, **kwargs)
+                        if cls.original_poll:
+                            original_cond = cls.original_poll(context, *args, **kwargs)
 
                         #specific poll condictions if in TOOL context
                         added_cond = True
                         if (space.type=='PROPERTIES' and space.context=='TOOL'):
                             tabval = get_customtab_value(space)
-                            if cls.CustTabIsUser:
-                                added_cond = tabval == cls.CustTabUserId
-                            else:
-                                #for headers panel, we always draw
-                                if (cls.CustTabIsHeader):
-                                      added_cond = True
-                                else: added_cond = tabval in {'TOOL',None}
+
+                            #for headers panel, we always draw
+                            if (cls.CustTabIsHeader):
+                                  added_cond = True
+                            else: added_cond = tabval in {'TOOL',None}
 
                         return original_cond and added_cond
 
@@ -698,6 +690,61 @@ def _reg_tool_impostors(regstatus:bool):
             _dprint('reloading children:',ocl)
             bpy.utils.unregister_class(ocl)
             bpy.utils.register_class(ocl)
+
+    return None
+
+USER_PANELS = []
+
+def _reg_userpanel(panel, uniqueid):
+    """Register bpy.types.Panel of a tab via this operator"""
+
+    global USER_PANELS
+
+    #we work with panels only
+    if not issubclass(panel, bpy.types.Panel):
+        raise Exception(f"CustomTab: Please pass a Panel type, subclass of bpy.types.Panel\nFor panel {panel}")
+    if ('_PT_' not in panel.__name__):
+        raise Exception(f"CustomTab: Any blender panels should contain the keyword '_PT_'. Please read blender doc!\nFor panel {panel}")
+
+    #we register only non-registerepatchedd classes
+    if hasattr(panel, 'CustTabIsPatched'):
+        raise Exception(f"CustomTab: It seems that you already have registered the Panel '{panel}'.")
+
+    class PatchPanel(panel):
+        """exact copy of original Panel class, but with tweaked poll behavior"""
+        __name__ = panel.__name__
+
+        bl_region_type = 'UI'
+        bl_category = 'Tool'
+        bl_space_type = 'VIEW_3D'
+        bl_idname = panel.__name__
+        
+        CustTabUniqueID = uniqueid
+        CustTabIsPatched = True
+        CustTabIsHeader = False
+
+        original_poll = panel.poll if hasattr(panel,'poll') else None
+
+        @classmethod
+        def poll(cls, context, *args, **kwargs):
+            """matched poll function, custom behavior in properties now, need to look at window_manager.CustomTab value"""
+
+            space = context.space_data
+            if (space.type!='PROPERTIES'):
+                return False
+            if (space.context!='TOOL'):
+                return False
+
+            #execute native poll function
+            original_cond = True
+            if cls.original_poll:
+                original_cond = cls.original_poll(context, *args, **kwargs)
+
+            #specific poll condictions if in TOOL context
+            return original_cond and get_customtab_value(space) == cls.CustTabUniqueID
+
+    bpy.utils.register_class(PatchPanel)
+    USER_PANELS.append(PatchPanel)
 
     return None
 
@@ -764,11 +811,13 @@ def _reg_nav_impostors(regstatus:bool):
 #                        d"     YD  
 #                        "Y88888P'  
 
-def append_tab(uniqueid:str="", icon:str|int="", name:str="", description:str="", poll=None, header=None, spacer=False,):
+IDAPPENDED_TO_REGISTRY = []
+
+def append_tab(uniqueid:str="", icon:str|int="", name:str="", description:str="", poll=None, header=None, spacer=False, panels:list=None,):
     """Register a new tab into the system.
 
     You can either:
-        - Pass a `uniqueid` (string) and an `icon` (string or integer)
+        - Pass a `uniqueid` (string), an `icon` (string or integer), and list of Panels to `panels`.
           with optional arguments:
             `name` (string) for the tab's display name
             `description` (string) for hover information, 
@@ -776,15 +825,16 @@ def append_tab(uniqueid:str="", icon:str|int="", name:str="", description:str=""
             `header` (function) that takes `layout` and `context` as arguments, for drawing a custom header.
         - Or set `spacer=True` to add a spacer between tabs.
     """
-    
+
+    global IDAPPENDED_TO_REGISTRY
     wm = bpy.context.window_manager
     
     if spacer:
         _append_registry(None)
         return None
 
-    if not (uniqueid and icon):
-        raise Exception("Please make sure to pass a unique uniqueid string and an icon value")
+    if not (uniqueid and icon and panels):
+        raise Exception("Please make sure to pass a uniqueid string, an icon value, and a list of panels.")
     
     if (uniqueid in POSSIBLE_NATIVE_ENTRIES):
         raise Exception(f"The uniqueid '{uniqueid}' is taken by blender already.")
@@ -801,6 +851,12 @@ def append_tab(uniqueid:str="", icon:str|int="", name:str="", description:str=""
         'poll':poll,
         'header':header,
         },)
+
+    IDAPPENDED_TO_REGISTRY.append(uniqueid)
+    
+    for panel in panels:
+        _reg_userpanel(panel, uniqueid)
+    
     return None
 
 
@@ -824,6 +880,7 @@ def register():
 def unregister():
     """the main customtab module unregister, execute me on plugin deload, before unregistering your panels."""
 
+    global IDAPPENDED_TO_REGISTRY, USER_PANELS
     wm = bpy.context.window_manager
 
     # 'TabCustv1_usercount' should always be there if there are other plugins as
@@ -833,29 +890,40 @@ def unregister():
 
     wm.TabCustv1_usercount -= 1
 
-    #We unregister all this only if no plugins are using it!
-    if (wm.TabCustv1_usercount <= 0):
-        _reg_nav_impostors(False)
-        _reg_tool_impostors(False)
-        _reg_handlers(False)
-        _reg_timers(False)
-        _del_registry()
+    #remove our enum items from the public centralized registry
+    for d in IDAPPENDED_TO_REGISTRY:
+        _remove_from_registry(d)
 
-        # cleanup any dynamically registered props?
-        delnames = set()
-        for attr in dir(bpy.types.WindowManager):
-            if attr.startswith('TabCustv1'):
-                delnames.add(attr)
-                try:
-                    delattr(bpy.types.WindowManager, attr)
-                except Exception as e:
-                    print("An Exception occured, couldn't delete a Property.")
-                    print(e)
+    #unregister our user panels
+    for panel in USER_PANELS:
+        bpy.utils.unregister_class(panel)
+        
+    # NOTE We do NOT Unregister. 
+    # The functions will automatically clear themselves for the next blender session!
 
-        #some properties convert themselves to user props
-        for name in delnames:
-            for wm in bpy.data.window_managers:
-                if name in wm:
-                    del wm[name]
+    # #We unregister all this only if no plugins are using it!
+    # if (wm.TabCustv1_usercount <= 0):
+    #     _reg_nav_impostors(False)
+    #     _reg_tool_impostors(False)
+    #     _reg_handlers(False)
+    #     _reg_timers(False)
+    #     _del_registry()
+
+    #     # cleanup any dynamically registered props?
+    #     delnames = set()
+    #     for attr in dir(bpy.types.WindowManager):
+    #         if attr.startswith('TabCustv1'):
+    #             delnames.add(attr)
+    #             try:
+    #                 delattr(bpy.types.WindowManager, attr)
+    #             except Exception as e:
+    #                 print("An Exception occured, couldn't delete a Property.")
+    #                 print(e)
+
+    #     #some properties convert themselves to user props
+    #     for name in delnames:
+    #         for wm in bpy.data.window_managers:
+    #             if name in wm:
+    #                 del wm[name]
 
     return None

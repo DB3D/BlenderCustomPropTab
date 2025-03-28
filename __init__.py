@@ -8,9 +8,6 @@ from . import customtab
 
 class TEST_PT_1(bpy.types.Panel):
     bl_label = "My custom curve"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_customtab = 'MYTAB_GHOST'
 
     @classmethod
     def poll(cls, context):
@@ -22,9 +19,6 @@ class TEST_PT_1(bpy.types.Panel):
 
 class TEST_PT_2(bpy.types.Panel):
     bl_label = "My custom panel"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_customtab = 'MYTAB_GHOST'
 
     def draw(self, context):
         self.layout.label(text="Monkey")
@@ -32,9 +26,6 @@ class TEST_PT_2(bpy.types.Panel):
 
 class TEST_PT_3(bpy.types.Panel):
     bl_label = "My Monkey"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_customtab = 'MYTAB_MONKEY'
 
     @classmethod
     def poll(cls, context):
@@ -46,9 +37,6 @@ class TEST_PT_3(bpy.types.Panel):
 
 class TEST_PT_3child(bpy.types.Panel):
     bl_label = ""
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_customtab = 'MYTAB_MONKEY'
     bl_parent_id = 'TEST_PT_3'
 
     def draw_header(self, context):
@@ -64,47 +52,59 @@ class TEST_PT_3child(bpy.types.Panel):
 
 class TEST_PT_4(bpy.types.Panel):
     bl_label = "Pc Panel"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_customtab = 'MYTAB_FOO'
 
     def draw(self, context):
         self.layout.label(text="Foo label")
 
 
-classes = (
-    TEST_PT_1,
-    TEST_PT_2,
-    TEST_PT_3,
-    TEST_PT_3child,
-    TEST_PT_4,
-    )
-
-
 def register():
 
-    #we first register our panels (order matter)
-    for cls in classes:
-        bpy.utils.register_class(cls)
+    #we first register the plugin classes (order matter)
+    # ...
+    # for cls in classes:
+    #     bpy.utils.register_class(cls)
 
     #then we initialize the module
     customtab.register()
 
-    def custom_poll_function(context):
-        #NOTE best to use context.active_object instead of context.object in the Properties editor.
+    #then append our custom tabs
+    customtab.append_tab(
+        uniqueid="MONKEYTAB",
+        icon="MONKEY", 
+        name="Monkey!",
+        description="This is a Monkey",
+        panels=(TEST_PT_3,TEST_PT_3child,),
+        )
+    
+    #it's possible to define a custom poll for our tab.
+    
+    def custom_poll(context):
+        #best to use context.active_object instead of context.object in the Properties editor.
         active = context.active_object
         return active and "Foo" in active.name
 
-    def custom_draw_header_function(layout,context):
+    customtab.append_tab(
+        uniqueid="MYFOOTAB",
+        icon="SYSTEM", 
+        poll=custom_poll, 
+        panels=(TEST_PT_4,),
+        )
+
+    #we can define a spacer
+    customtab.append_tab(spacer=True)
+    
+    #it's possible 
+    def header_drawing(layout,context):
         layout.label(text='Custom header!')
         layout.operator('mesh.primitive_plane_add', text='Add Plane')
         return None
 
-    #then append our custom tabs. (No need to remove them on unreg.)
-    customtab.append_tab(uniqueid="MYTAB_MONKEY", icon="MONKEY", name="Monkey!", description="This is a Monkey",)
-    customtab.append_tab(uniqueid="MYTAB_FOO", icon="SYSTEM", poll=custom_poll_function,) 
-    customtab.append_tab(spacer=True)
-    customtab.append_tab(uniqueid="MYTAB_GHOST", icon="GHOST_ENABLED", header=custom_draw_header_function,)
+    customtab.append_tab(
+        uniqueid="SCARYGHOST",
+        icon="GHOST_ENABLED",
+        header=header_drawing,
+        panels=(TEST_PT_1,TEST_PT_2,),
+        )
 
     return None
 
@@ -114,8 +114,9 @@ def unregister():
     #we de-initialize our module first (order matter)
     customtab.unregister()
 
-    #then unregister our panels 
-    for cls in reversed(classes):
-        bpy.utils.unregister_class(cls)
+    # then we unregister our plugin 
+    # ...
+    # for cls in reversed(classes):
+    #     bpy.utils.unregister_class(cls)
 
     return None
