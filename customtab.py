@@ -374,7 +374,7 @@ def _reg_enumproperty_for_space(space):
     default_idx = [t[4] for t in current_items if (type(t) is tuple) and (t[0]==space.context)][0]
 
     prop = bpy.props.EnumProperty(
-        name="Properties Tab",
+        name="",
         default=default_idx,
         items=lambda self, context: _generate_enumitems(context, context.space_data),
         update=lambda self, context: sync_spacecontext(dynpropname, context=context,),
