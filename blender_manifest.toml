@@ -2,11 +2,11 @@ schema_version = "1.0.0"
 
 # Example of manifest file for a Blender extension
 # Change the values according to your extension
-id = "testdyntab"
+id = "customtabs"
 version = "1.0.0"
-name = "Dynamic Properties Tabs"
-tagline = "Dynamic context enum per Properties editor, synced with actual context"
-maintainer = "contact@geoscatter.com"
+name = "Test Custom Tabs"
+tagline = "A solution to put new tabs in the Properties editor."
+maintainer = "Community"
 # Supported types: "add-on", "theme"
 type = "add-on"
 
