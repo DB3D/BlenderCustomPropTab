@@ -81,9 +81,12 @@ module_info = {
 # - Fix the horrible try-except for tab context; might do two in one with the solution below.
 # - Fix the problem when swapping the active object. The tab might change, but not the enum active index.
 #   We could fix this with a context.object msgbus, perhaps. Or, we define precise poll behaviors of tabs; when polling changes, we act on the index.
-# - What about panel search? Can we support this? What we need to do is highlight proper active items, just that.
-# - Toggle_pin button. Custom operator?
+# - Test if custom icon integer are working on panel as well.
 # - Problem with spacers if tabs are disappearing; use spacer_after instead of spacer.
+# - Bonus:
+#   - What about panel search? What we need to do is highlight proper active items, just that.
+#   - Toggle_pin button. Custom operator?
+#   - FInd unregistration solution
 
 import bpy
 import os
@@ -138,7 +141,6 @@ POSSIBLE_NATIVE_ENTRIES = [
 #  888       8    888    888   888  `"Y88b.  
 #  `88.    .8'    888 .  888   888  o.  )88b 
 #    `YbodP'      "888" o888o o888o 8""888P' 
-
 
 def _dprint(*args):
     """debug print"""
