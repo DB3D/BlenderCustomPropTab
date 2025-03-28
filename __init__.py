@@ -27,7 +27,7 @@ class TEST_PT_2(bpy.types.Panel):
     bl_customtab = 'MYTAB_GHOST'
 
     def draw(self, context):
-        self.layout.label(text="Prooot")
+        self.layout.label(text="Monkey")
 
 
 class TEST_PT_3(bpy.types.Panel):
@@ -101,7 +101,7 @@ def register():
         return None
 
     #then append our custom tabs. (No need to remove them on unreg.)
-    customtab.append_tab(uniqueid="MYTAB_MONKEY", icon="MONKEY", name="Proot", description="Monkey proot",)
+    customtab.append_tab(uniqueid="MYTAB_MONKEY", icon="MONKEY", name="Monkey!", description="This is a Monkey",)
     customtab.append_tab(uniqueid="MYTAB_FOO", icon="SYSTEM", poll=custom_poll_function,) 
     customtab.append_tab(spacer=True)
     customtab.append_tab(uniqueid="MYTAB_GHOST", icon="GHOST_ENABLED", header=custom_draw_header_function,)
