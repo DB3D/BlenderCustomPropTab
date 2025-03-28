@@ -81,18 +81,20 @@ module_info = {
 # - Fix the horrible try-except for tab context; might do two in one with the solution below.
 # - Fix the problem when swapping the active object. The tab might change, but not the enum active index.
 #   We could fix this with a context.object msgbus, perhaps. Or, we define precise poll behaviors of tabs; when polling changes, we act on the index.
-# - Test if custom icon integer are working on panel as well.
-# - Problem with spacers if tabs are disappearing; use spacer_after instead of spacer.
+# - Test if custom icon integer are working on panel as well. Might need a patch..
+# - Problem with spacers if tabs are disappearing; use spacer_after instead of spacer, or better, create tabgroups
 # - Bonus:
-#    - What about panel search? What we need to do is highlight proper active items, just that.
-#    - Toggle_pin button. Custom operator?
+#    - What about panel search tab highlight? how to fix tab highlight?
+#    - Toggle_pin button. Custom solution? custom operator?
 #    - Find unregistration solution
-#    - would be nice if the users can choose the emplacement of their tabs. With tools? with render? with scene? with objects? with material? with collection? at the end?
+#    - would be nice if the users can choose the emplacement of their tabs. 
+#      With tools? with render? with scene? with objects? with material? with collection? at the end?
+#      Could be fixed with tabgroup implementation
+#    - Store DEBUG_MODE in window_manager as well.
+#    - alongside tabgroup rework, we should add the ability to 'insert' after another uniqueid. would make things simpler. Depending on insert, we choose the tab groups
 
 import bpy
-import os
 from collections.abc import Iterable
-import importlib.util
 
 # oooooooooo.                 .             
 # `888'   `Y8b              .o8             
@@ -103,7 +105,7 @@ import importlib.util
 # o888bood8P'   `Y888""8o   "888" `Y888""8o 
 
 # the native possible items
-EXISTING_ITEMS = [
+NATIVE_ITEMS = [
     {'id':'TOOL',            'icon':'TOOL_SETTINGS',   'poll':None, 'name':"Tool",             'description':"Active Tool and Workspace settings",},
     None,
     {'id':'RENDER',          'icon':'SCENE',           'poll':None, 'name':"Render",           'description':"Render Properties",},
@@ -128,12 +130,11 @@ EXISTING_ITEMS = [
     {'id':'TEXTURE',         'icon':'TEXTURE',         'poll':None, 'name':"Texture",          'description':"Texture Properties",},
     ]
 
-POSSIBLE_NATIVE_ENTRIES = [
+NATIVE_IDS = [
     e['id']
-    for e in EXISTING_ITEMS 
+    for e in NATIVE_ITEMS 
     if type(e) is dict
     ]
-
 
 # ooooo     ooo     .    o8o  oooo           
 # `888'     `8'   .o8    `"'  `888           
@@ -192,11 +193,13 @@ def _get_dataicon_fromcontext(obj=None) -> str:
         'LIGHT_PROBE': 'LIGHTPROBE_SPHERE',
         'SPEAKER': 'SPEAKER',
         }
-    
-    corresponding = icons.get(obj.type, 'QUESTION')
 
-    if corresponding=='EMPTY_DATA':
-        if type(obj.data) is bpy.types.Image:
+    corresponding = icons.get(obj.type)
+    if (corresponding is None):
+        return 'QUESTION'
+
+    if (corresponding=='EMPTY_DATA'):
+        if (type(obj.data) is bpy.types.Image):
             corresponding = 'IMAGE_DATA'
 
     return corresponding
@@ -221,6 +224,7 @@ def get_customtab_propname(space) -> str:
 
     moduleidentifier = 'TabCustv1'
     memadress = space.as_pointer()
+
     return f'{moduleidentifier}_enum{memadress}'
 
 def get_customtab_value(space):
@@ -247,7 +251,7 @@ def sync_spacecontext(propname, context=None,):
 
     # If the user chose a custom enum entry, then we set the active tab to tool.
     # all custom panels use the tool tab 
-    if (selected not in POSSIBLE_NATIVE_ENTRIES):
+    if (selected not in NATIVE_IDS):
         selected = 'TOOL'
 
     # we synchronize context value
@@ -281,8 +285,7 @@ def sync_customtab(space,):
 def _generate_enumitems(context, space) -> list:
     """generate an enum list depending on context space and encoded globals"""
 
-    wm = bpy.context.window_manager
-    if space is None:
+    if (space is None):
         return None
     if (space.type!='PROPERTIES'):
         return None
@@ -291,7 +294,7 @@ def _generate_enumitems(context, space) -> list:
     # so we fill the Enumitems with the compatible native entries, depending on context!
     old_context = str(space.context)
     r, i = [], 0
-    for v in EXISTING_ITEMS:
+    for v in NATIVE_ITEMS:
 
         #None are spacers
         if (v is None):
@@ -305,7 +308,8 @@ def _generate_enumitems(context, space) -> list:
         # Lazy dirty solution to check if the items are available. We can't use this on the long term because this function is executing constantly.
         # Unsure how to easily get what's available depending on context. Perhaps need to define conditions manually. i hope not..
         try: space.context = v['id']
-        except: continue
+        except:
+            continue
 
         uniqueid, icon, poll = v['id'], v['icon'], v['poll']
 
@@ -376,27 +380,32 @@ def _reg_enumproperty_for_space(space):
         update=lambda self, context: sync_spacecontext(dynpropname, context=context,),
         )
 
-    print(f"DynamicReg:{dynpropname}")
+    _dprint(f"DynamicReg:{dynpropname}")
     setattr(bpy.types.WindowManager, dynpropname, prop)
 
     return None
 
 #Registry is a global list containing None or Dicts of strings or function we store on bpy.types.WindowManager
-#Similar struct to EXISTING_ITEMS, but with added header, poll functions
+#Similar struct to NATIVE_ITEMS, but with added header, poll functions
 
 def _get_registry():
     wm = bpy.context.window_manager
+
     if not hasattr(wm,'TabCustomv1Registry'):
         bpy.types.WindowManager.TabCustomv1Registry = []
+
     return wm.TabCustomv1Registry
 
 def _del_registry():
     wm = bpy.context.window_manager
+
     for wm in bpy.data.window_managers:
         if hasattr(wm,'TabCustomv1Registry'):
             wm.TabCustomv1Registry.clear()
+
     if hasattr(bpy.types.WindowManager,'TabCustomv1Registry'):
         del bpy.types.WindowManager.TabCustomv1Registry
+
     return None
 
 def _append_registry(item):
@@ -529,29 +538,24 @@ def _reg_tool_impostors(regstatus:bool):
     classes_children = []
 
     #gather the classes we need to patch. All type UI TOOL for View3D..
-    for attr in dir(bpy.types):
+    for panel in bpy.types.Panel.__subclasses__():
 
-        #we work with panels only
-        if ('_PT_' not in attr):
-            continue
-
-        cls = getattr(bpy.types,attr)
-        
         #user classes we skip. separate function for that.
-        if hasattr(cls,'CustTabUniqueID'):
+        if hasattr(panel,'CustTabUniqueID'):
             continue
 
         #ensure the attributes are correct
-        if not (hasattr(cls,'bl_region_type') and hasattr(cls,'bl_category') and hasattr(cls,'bl_space_type') \
-                and (cls.bl_region_type=='UI' and cls.bl_category=="Tool" and cls.bl_space_type=='VIEW_3D')):
+        if not (hasattr(panel,'bl_region_type') and hasattr(panel,'bl_category') and hasattr(panel,'bl_space_type') \
+                and (panel.bl_region_type=='UI' and panel.bl_category=="Tool" and panel.bl_space_type=='VIEW_3D')):
             continue
         
-        #store children separately
-        if hasattr(cls,'bl_parent_id'):
-              classes_children.append(cls)
+        #store children separately, 
+        #we only patch the parents then reload the children
+        if hasattr(panel,'bl_parent_id'):
+              classes_children.append(panel)
               continue
 
-        classes_to_patch.append(cls)
+        classes_to_patch.append(panel)
         continue
 
     #proceed to the registration of patches
@@ -839,7 +843,7 @@ def append_tab(uniqueid:str="", icon:str|int="", name:str="", description:str=""
     if not (uniqueid and icon and panels):
         raise Exception("Please make sure to pass a uniqueid string, an icon value, and a list of panels.")
     
-    if (uniqueid in POSSIBLE_NATIVE_ENTRIES):
+    if (uniqueid in NATIVE_IDS):
         raise Exception(f"The uniqueid '{uniqueid}' is taken by blender already.")
     
     if (uniqueid in _existing_registry_ids()):
