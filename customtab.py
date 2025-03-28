@@ -895,10 +895,12 @@ def unregister():
     #remove our enum items from the public centralized registry
     for d in IDAPPENDED_TO_REGISTRY:
         _remove_from_registry(d)
+    IDAPPENDED_TO_REGISTRY.clear()
 
     #unregister our user panels
     for panel in USER_PANELS:
         bpy.utils.unregister_class(panel)
+    USER_PANELS.clear()
         
     # NOTE We do NOT Unregister. 
     # The functions will automatically clear themselves for the next blender session!
