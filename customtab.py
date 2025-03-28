@@ -43,7 +43,7 @@
 DEBUG_MODE = False
 
 module_info = {
-    'version':(1,0),
+    'version':(0,9), #In beta. Need some work..
     'blender_version_min':(4,2,0),
 }
 
@@ -84,9 +84,10 @@ module_info = {
 # - Test if custom icon integer are working on panel as well.
 # - Problem with spacers if tabs are disappearing; use spacer_after instead of spacer.
 # - Bonus:
-#   - What about panel search? What we need to do is highlight proper active items, just that.
-#   - Toggle_pin button. Custom operator?
-#   - FInd unregistration solution
+#    - What about panel search? What we need to do is highlight proper active items, just that.
+#    - Toggle_pin button. Custom operator?
+#    - Find unregistration solution
+#    - would be nice if the users can choose the emplacement of their tabs. With tools? with render? with scene? with objects? with material? with collection? at the end?
 
 import bpy
 import os
