@@ -5,6 +5,9 @@
 import bpy
 from . import customtab
 
+# NOTE this file is an implementation example 
+# see how the customtab module is used. 
+# implement your own panels and plugin structure.
 
 class TEST_PT_1(bpy.types.Panel):
     bl_label = "My custom curve"
