@@ -11,7 +11,7 @@ class TEST_PT_1(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return (context.object.type == 'CURVE')
+        return (context.object and context.object.type == 'CURVE')
 
     def draw(self, context):
         self.layout.label(text="CurveSpecial")
