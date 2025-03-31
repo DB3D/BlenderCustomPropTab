@@ -43,7 +43,7 @@
 DEBUG_MODE = False
 
 module_info = {
-    'version':(0,9), #In beta. Need some work..
+    'version':(0,9,1), #In beta. Need some work..
     'blender_version_min':(4,2,0),
 }
 
@@ -81,16 +81,11 @@ module_info = {
 # - Fix the problem when swapping the active object. The tab might change, but not the enum active index.
 #   We could fix this with a context.object msgbus, perhaps. Or, we define precise poll behaviors of tabs; when polling changes, we act on the index.
 # - Test if custom icon integer are working on panel as well. Might need a patch..
-# - Problem with spacers if tabs are disappearing; use spacer_after instead of spacer, or better, create tabgroups
 # - Bonus:
 #    - What about panel search tab highlight? how to fix tab highlight?
 #    - Toggle_pin button. Custom solution? custom operator?
-#    - Find unregistration solution
-#    - would be nice if the users can choose the emplacement of their tabs. 
-#      With tools? with render? with scene? with objects? with material? with collection? at the end?
-#      Could be fixed with tabgroup implementation
+#    - Find unregistration solution, in case all plugins users decide to unregister their classes.
 #    - Store DEBUG_MODE in window_manager as well.
-#    - alongside tabgroup rework, we should add the ability to 'insert' after another uniqueid. would make things simpler. Depending on insert, we choose the tab groups
 
 import bpy
 from collections.abc import Iterable
@@ -173,28 +168,28 @@ from collections.abc import Iterable
 
 # the native possible items
 NATIVE_ITEMS = [
-    {'id':'TOOL',            'icon':'TOOL_SETTINGS',   'poll':None, 'name':"Tool",             'description':"Active Tool and Workspace settings",},
-    None,
-    {'id':'RENDER',          'icon':'SCENE',           'poll':None, 'name':"Render",           'description':"Render Properties",},
-    {'id':'OUTPUT',          'icon':'OUTPUT',          'poll':None, 'name':"Output",           'description':"Output Properties",},
-    {'id':'VIEW_LAYER',      'icon':'RENDERLAYERS',    'poll':None, 'name':"View Layer",       'description':"View Layer Properties",},
-    {'id':'SCENE',           'icon':'SCENE_DATA',      'poll':None, 'name':"Scene",            'description':"Scene Properties",},
-    {'id':'WORLD',           'icon':'WORLD',           'poll':None, 'name':"World",            'description':"World Properties",},
-    None,
-    {'id':'COLLECTION',      'icon':'GROUP',           'poll':None, 'name':"Collection",       'description':"Collection Properties",},
-    None,
-    {'id':'OBJECT',          'icon':'OBJECT_DATA',     'poll':None, 'name':"Object",           'description':"Object Properties",},
-    {'id':'MODIFIER',        'icon':'MODIFIER',        'poll':None, 'name':"Modifiers",        'description':"Modifier Properties",},
-    {'id':'SHADERFX',        'icon':'SHADERFX',        'poll':None, 'name':"Effects",          'description':"Visual Effects Properties",},
-    {'id':'PARTICLES',       'icon':'PARTICLES',       'poll':None, 'name':"Particles",        'description':"Particle Properties",},
-    {'id':'PHYSICS',         'icon':'PHYSICS',         'poll':None, 'name':"Physics",          'description':"Physics Properties",},
-    {'id':'CONSTRAINT',      'icon':'CONSTRAINT',      'poll':None, 'name':"Constraints",      'description':"Object Constraint Properties",},
-    {'id':'DATA',            'icon':'*DATA_SPECIAL*',  'poll':None, 'name':"Data",             'description':"Object Data Properties",},
-    {'id':'BONE',            'icon':'BONE_DATA',       'poll':None, 'name':"Bone",             'description':"Bone Properties",},
-    {'id':'BONE_CONSTRAINT', 'icon':'CONSTRAINT_BONE', 'poll':None, 'name':"Bone Constraints", 'description':"Bone Constraint Properties",},
-    {'id':'MATERIAL',        'icon':'MATERIAL',        'poll':None, 'name':"Material",         'description':"Material Properties",},
-    None,
-    {'id':'TEXTURE',         'icon':'TEXTURE',         'poll':None, 'name':"Texture",          'description':"Texture Properties",},
+    {'id':'TOOL',            'group':'TOOLS',      'icon':'TOOL_SETTINGS',   'poll':None, 'name':"Tool",             'description':"Active Tool and Workspace settings",},
+    # None,
+    {'id':'RENDER',          'group':'SCENE',      'icon':'SCENE',           'poll':None, 'name':"Render",           'description':"Render Properties",},
+    {'id':'OUTPUT',          'group':'SCENE',      'icon':'OUTPUT',          'poll':None, 'name':"Output",           'description':"Output Properties",},
+    {'id':'VIEW_LAYER',      'group':'SCENE',      'icon':'RENDERLAYERS',    'poll':None, 'name':"View Layer",       'description':"View Layer Properties",},
+    {'id':'SCENE',           'group':'SCENE',      'icon':'SCENE_DATA',      'poll':None, 'name':"Scene",            'description':"Scene Properties",},
+    {'id':'WORLD',           'group':'SCENE',      'icon':'WORLD',           'poll':None, 'name':"World",            'description':"World Properties",},
+    # None,
+    {'id':'COLLECTION',      'group':'COLLECTION', 'icon':'GROUP',           'poll':None, 'name':"Collection",       'description':"Collection Properties",},
+    # None,
+    {'id':'OBJECT',          'group':'OBJECT',     'icon':'OBJECT_DATA',     'poll':None, 'name':"Object",           'description':"Object Properties",},
+    {'id':'MODIFIER',        'group':'OBJECT',     'icon':'MODIFIER',        'poll':None, 'name':"Modifiers",        'description':"Modifier Properties",},
+    {'id':'SHADERFX',        'group':'OBJECT',     'icon':'SHADERFX',        'poll':None, 'name':"Effects",          'description':"Visual Effects Properties",},
+    {'id':'PARTICLES',       'group':'OBJECT',     'icon':'PARTICLES',       'poll':None, 'name':"Particles",        'description':"Particle Properties",},
+    {'id':'PHYSICS',         'group':'OBJECT',     'icon':'PHYSICS',         'poll':None, 'name':"Physics",          'description':"Physics Properties",},
+    {'id':'CONSTRAINT',      'group':'OBJECT',     'icon':'CONSTRAINT',      'poll':None, 'name':"Constraints",      'description':"Object Constraint Properties",},
+    {'id':'DATA',            'group':'OBJECT',     'icon':'*DATAICON*',      'poll':None, 'name':"Data",             'description':"Object Data Properties",},
+    {'id':'BONE',            'group':'OBJECT',     'icon':'BONE_DATA',       'poll':None, 'name':"Bone",             'description':"Bone Properties",},
+    {'id':'BONE_CONSTRAINT', 'group':'OBJECT',     'icon':'CONSTRAINT_BONE', 'poll':None, 'name':"Bone Constraints", 'description':"Bone Constraint Properties",},
+    {'id':'MATERIAL',        'group':'OBJECT',     'icon':'MATERIAL',        'poll':None, 'name':"Material",         'description':"Material Properties",},
+    # None,
+    {'id':'TEXTURE',         'group':'TEXTURE',     'icon':'TEXTURE',        'poll':None, 'name':"Texture",          'description':"Texture Properties",},
     ]
 
 NATIVE_IDS = [
@@ -367,27 +362,57 @@ def _generate_enumitems(context, space) -> list:
     except Exception as e:
         # NOTE if blender developers change how the error message is generated, this will break.
         msg = str(e) #ex: `bpy_struct: item.attr = val: enum "HEYDUDE" not found in ('TOOL', 'RENDER',)`
-        start = msg.find("not found in (") + 1
-        tuplestr = msg[start:-1]
-        tabs_available = set(tuplestr.replace("'","").replace(" ","").split(","))
+        tuplestr = msg.split("not found in (")[1].replace(')','')
+        tabs_available = set(tuplestr.replace("'",'').replace(' ','').split(","))
+    
+    # Here below we merge the native items with the user items, following the group order.
+    native_items = list(NATIVE_ITEMS)
+    for v in native_items:
+        v['native'] = True
+    merged_items = native_items.copy()
+    # Find the last index for each group
+    gridx = {}
+    for i, item in enumerate(merged_items):
+        if (item):
+            gridx[item['group']] = i
+    # Insert user items after the last item of the same group
+    for v in _get_registry():
+        #None used to me manual spacers.
+        if (v is None):
+            continue
+        g = v['group']
+        if g in gridx:
+            # Insert after the last item of the same group
+            insert_index = gridx[g] + 1
+            merged_items.insert(insert_index, v)
+            # Update indices for all groups
+            for i in gridx:
+                if (gridx[i] >= insert_index):
+                    gridx[i] += 1
+            # Update this group's last index
+            gridx[g] = insert_index
+        else:
+            # If group not found, append to the end
+            merged_items.append(v)
+            gridx[g] = len(merged_items) - 1
 
     # Generate enum items based on context polling rather than try-except
-    r, i = [], 0
-    for v in NATIVE_ITEMS:
+    r, i, activegr = [], 0, None
+    for v in merged_items:
 
-        # None are spacers
-        if (v is None):
-            # we don't draw two spacers in a row!
-            if (r and r[-1] is None):
-                continue
-            r.append(None)
-            continue
-
-        uniqueid, icon, poll = v['id'], v['icon'], v['poll']
+        uniqueid, icon, poll, group, native = v['id'], v['icon'], v['poll'], v['group'], v.get('native',False)
 
         # filter out tabs that are not available in current context.
-        if (uniqueid not in tabs_available):
+        if (native and (uniqueid not in tabs_available)):
             continue
+        # some groups are context dependent:
+        match group:
+            case 'OBJECT':
+                if (context.object is None):
+                    continue
+            case 'COLLECTION':
+                if (context.collection is None):
+                    continue
 
         # support for tab poll functions
         if (poll):
@@ -395,38 +420,19 @@ def _generate_enumitems(context, space) -> list:
                 if (not poll(context)):
                     continue
             except Exception as e:
-                print(f"WARNING: tab uniqueid '{uniqueid}' poll function failed!\n{e}\nFrom module instance: {__file__}")
+                print(f"WARNING: tab '{uniqueid}' poll function failed!\n{e}\nFrom module instance: {__file__}")
                 continue
+
+        # Add spacer if group changes
+        if ((activegr is not None) and (group != activegr)):
+            if (len(r) > 0) and (r[-1] is not None):  # Don't add consecutive spacers
+                r.append(None)
+
+        activegr = group
 
         # Icons of mesh data varies depending on active object
-        if (icon=='*DATA_SPECIAL*'):
+        if (icon=='*DATAICON*'):
             icon = _get_dataicon_fromcontext(context.active_object)
-
-        r.append((uniqueid, v['name'], v['description'], icon, i))
-        i += 1
-        continue
-
-    #Fill our enum items with the added custom elements then!
-    for v in _get_registry():
-        
-        #None are spacers
-        if (v is None):
-            # we don't draw two spacers in a row!
-            if (len(r)) and (r[-1]==None):
-                continue
-            r.append(None)
-            continue
-
-        uniqueid, icon, poll = v['id'], v['icon'], v['poll']
-
-        #support for tab poll functions
-        if (poll):
-            try:
-                if (not poll(context)):
-                    continue
-            except Exception as e:
-                print(f"WARNING: tab uniqueid '{uniqueid}' poll function failed!\n{e}\nFrom module instance: {__file__}")
-                continue
 
         r.append((uniqueid, v['name'], v['description'], icon, i))
         i += 1
@@ -673,31 +679,53 @@ def _reg_tool_impostors(regstatus:bool):
                                     tabname = _get_from_registry(tabval,'name')
                                     tabicon = _get_from_registry(tabval,'icon')
                                     tabheader = _get_from_registry(tabval,'header')
+                                    tabdraw = _get_from_registry(tabval,'draw')
+                                    tabgroup = _get_from_registry(tabval,'group')
 
                                     #draw a custom header function?
                                     if (tabheader):
-                                        return tabheader(layout, context)
+                                        tabheader(layout, context)
 
-                                    #else we draw a little simple drawing
-                                    row = layout.row()
-                                    row_left = row.row()
-                                    row_left.alignment = 'LEFT'
-                                    row_right = row.row()
-                                    row_right.alignment = 'RIGHT'
+                                    else:
+                                        #else we draw a little simple drawing
+                                        row = layout.row()
+                                        row_left = row.row(align=True)
+                                        row_left.alignment = 'LEFT'
+                                        row_right = row.row(align=True)
+                                        row_right.alignment = 'RIGHT'
 
-                                    if (tabicon):
-                                        match tabicon:
-                                            case str(): row_left.label(text='', icon=tabicon,)
-                                            case int(): row_left.label(text='', icon_value=tabicon,)
+                                        #draw a little breadcrumb if the panel is in group that draws a breadcrumb
+                                        match tabgroup:
+                                            case 'SCENE':
+                                                row_left.label(text='Scene', icon='SCENE_DATA')
+                                                row_left.label(text='', icon='RIGHTARROW')
+                                            case 'COLLECTION':
+                                                row_left.label(text=context.collection.name if context.collection else 'Collection', icon='COLLECTION')
+                                                row_left.label(text='', icon='RIGHTARROW')
+                                            case 'OBJECT':
+                                                row_left.label(text=context.object.name if context.object else 'Object', icon='OBJECT_DATA')
+                                                row_left.label(text='', icon='RIGHTARROW')
 
-                                    if (tabname):
-                                        row_left.label(text=tabname)
+                                        #draw the icon
+                                        if (tabicon):
+                                            match tabicon:
+                                                case str(): row_left.label(text='', icon=tabicon,)
+                                                case int(): row_left.label(text='', icon_value=tabicon,)
 
-                                    # TODO custom behavior for pin perhaps? Native pin was not designed for Tool context..
-                                    # pin_icon = 'PINNED' if bool(space.pin_id) else 'UNPINNED'
-                                    # row_right.operator("buttons.toggle_pin", text="", icon=pin_icon, emboss=False,)
+                                        if (tabname):
+                                            row_left.label(text=tabname)
 
+                                        # TODO custom behavior for pin perhaps? Native pin was not designed for Tool context..
+                                        # pin_icon = 'PINNED' if bool(space.pin_id) else 'UNPINNED'
+                                        # row_right.operator("buttons.toggle_pin", text="", icon=pin_icon, emboss=False,)
+
+                                    #separate header from content
                                     layout.separator(factor=0.5)
+
+                                    #draw a custom layout?
+                                    if (tabdraw):
+                                        tabdraw(layout, context)
+
                                     return None
 
                         #debug data?
@@ -900,29 +928,25 @@ def _reg_nav_impostors(regstatus:bool):
 #                        "Y88888P'  
 
 IDAPPENDED_TO_REGISTRY = []
-
-def append_tab(uniqueid:str="", icon:str|int="", name:str="", description:str="", poll=None, header=None, spacer=False, panels:list=None,):
+def append_tab(uniqueid:str="", icon:str|int="", name:str="", description:str="", poll=None, header=None, draw=None, panels:list=None, group:str='PLUGINS',):
     """Register a new tab into the system.
-
-    You can either:
-        - Pass a `uniqueid` (string), an `icon` (string or integer), and list of Panels to `panels`.
-          with optional arguments:
-            `name` (string) for the tab's display name
-            `description` (string) for hover information, 
-            `poll` (function) that takes `context` as an argument and returns a Boolean,
-            `header` (function) that takes `layout` and `context` as arguments, for drawing a custom header.
-        - Or set `spacer=True` to add a spacer between tabs.
+    You must pass:
+        `uniqueid` (string), 
+        `icon` (string or integer)
+    with optional arguments:
+        `group` (string) for grouping tabs together with spaces in between. Either choose an group exisiting in ('TOOLS','SCENE','COLLECTION','OBJECT','TEXTURE',) to spawn your tab near these items, or create your new group. If not provided, the tab will be appended to 'PLUGINS'.
+        `panels` (list of Panels, children of bpy.types.Panel)
+        `name` (string) for the tab's display name
+        `description` (string) for hover information, 
+        `poll` (function) that takes `context` as an argument and returns a Boolean,
+        `header` (function) that takes `layout` and `context` as arguments, for drawing a custom header.
+        `draw` (function) that takes `layout` and `context` as arguments, for drawing a custom layout (use this instead of relying on 'panels').
     """
 
     global IDAPPENDED_TO_REGISTRY
-    wm = bpy.context.window_manager
-    
-    if spacer:
-        _append_registry(None)
-        return None
 
-    if not (uniqueid and icon and panels):
-        raise Exception("Please make sure to pass a uniqueid string, an icon value, and a list of panels.")
+    if not (uniqueid and icon):
+        raise Exception("Please make sure to at least pass a uniqueid string and an icon value.")
     
     if (uniqueid in NATIVE_IDS):
         raise Exception(f"The uniqueid '{uniqueid}' is taken by blender already.")
@@ -938,13 +962,17 @@ def append_tab(uniqueid:str="", icon:str|int="", name:str="", description:str=""
         'icon':icon,
         'poll':poll,
         'header':header,
+        'draw':draw,
+        'group':group,
         },)
 
     IDAPPENDED_TO_REGISTRY.append(uniqueid)
-    
-    for panel in panels:
-        _reg_userpanel(panel, uniqueid)
-    
+
+    # register the panels ourselves
+    if (panels):
+        for panel in panels:
+            _reg_userpanel(panel, uniqueid)
+
     return None
 
 
