@@ -78,14 +78,16 @@ module_info = {
 #   we took extra care to register/unregister Properties, Classes, and panels only when needed.
 
 # TODO: 
-# - Fix the problem when swapping the active object. The tab might change, but not the enum active index.
-#   We could fix this with a context.object msgbus, perhaps. Or, we define precise poll behaviors of tabs; when polling changes, we act on the index.
-# - Test if custom icon integer are working on panel as well. Might need a patch..
+# - Important: 
+#    - Fix the problem when swapping the active object. The tab might change, but not the enum active index.
+#      We could fix this with a context.active_object msgbus, perhaps. Or, we define precise poll behaviors of tabs; when polling changes, we act on the index.
+#    - Test if custom icon integer are working on panel as well. Might need a patch..
 # - Bonus:
 #    - What about panel search tab highlight? how to fix tab highlight?
 #    - Toggle_pin button. Custom solution? custom operator?
 #    - Find unregistration solution, in case all plugins users decide to unregister their classes.
 #    - Store DEBUG_MODE in window_manager as well.
+#    - append after/before a specific tabid??
 
 import bpy
 from collections.abc import Iterable
@@ -122,11 +124,11 @@ from collections.abc import Iterable
 # def _poll_world(context):
 #     return True
 
-# def _poll_collection(context):
-#     return (context.collection!=context.scene.collection)
+def _poll_collection(context):
+    return (context.collection!=context.scene.collection)
 
-# def _poll_object(context):
-#     return (context.active_object is not None)
+def _poll_object(context):
+    return (context.active_object is not None)
 
 # def _poll_modifier(context):
 #     obj = context.active_object
@@ -408,10 +410,10 @@ def _generate_enumitems(context, space) -> list:
         # some groups are context dependent:
         match group:
             case 'OBJECT':
-                if (context.object is None):
+                if not _poll_object(context):
                     continue
             case 'COLLECTION':
-                if (context.collection is None):
+                if not _poll_collection(context):
                     continue
 
         # support for tab poll functions
@@ -703,7 +705,7 @@ def _reg_tool_impostors(regstatus:bool):
                                                 row_left.label(text=context.collection.name if context.collection else 'Collection', icon='COLLECTION')
                                                 row_left.label(text='', icon='RIGHTARROW')
                                             case 'OBJECT':
-                                                row_left.label(text=context.object.name if context.object else 'Object', icon='OBJECT_DATA')
+                                                row_left.label(text=context.active_object.name if context.active_object else 'Object', icon='OBJECT_DATA')
                                                 row_left.label(text='', icon='RIGHTARROW')
 
                                         #draw the icon

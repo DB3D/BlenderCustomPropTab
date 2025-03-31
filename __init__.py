@@ -2,20 +2,23 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-import bpy
-from . import customtab
-
 # NOTE this file is an implementation example 
 # see how the customtab module is used. 
 # implement your own panels and plugin structure.
 
-# Example of panels
+# NOTE general advice:
+# - always use 'context.active_object' instead of 'context.object' in the Properties editor.
+
+import bpy
+from . import customtab #we import our customtab module. 
+
+# Example of your plugin panels
 
 class TEST_PT_1(bpy.types.Panel):
     bl_label = "My custom curve"
     @classmethod
     def poll(cls, context):
-        return (context.object and context.object.type == 'CURVE')
+        return (context.active_object and context.active_object.type == 'CURVE')
     def draw(self, context):
         self.layout.label(text="CurveSpecial")
 
@@ -74,7 +77,6 @@ def register():
     #it's possible to define a custom poll for our tab.
 
     def custom_poll(context):
-        #NOTE best to use context.active_object instead of context.object in the Properties editor.
         active = context.active_object
         return active and "Foo" in active.name
 
