@@ -1,4 +1,4 @@
-## A module that let you register new tabs in the Properties Editor
+## Easy-use Module for Registering New Tabs in the Properties Editor
 Please read `customtab.py` notes for all required informations.
 
 Consider this plugin an implementation example of the customtab module.
