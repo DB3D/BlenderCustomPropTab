@@ -78,7 +78,6 @@ module_info = {
 #   we took extra care to register/unregister Properties, Classes, and panels only when needed.
 
 # TODO: 
-# - Fix the horrible try-except for tab context; might do two in one with the solution below.
 # - Fix the problem when swapping the active object. The tab might change, but not the enum active index.
 #   We could fix this with a context.object msgbus, perhaps. Or, we define precise poll behaviors of tabs; when polling changes, we act on the index.
 # - Test if custom icon integer are working on panel as well. Might need a patch..
@@ -103,6 +102,74 @@ from collections.abc import Iterable
 #  888      888  .oP"888    888    .oP"888  
 #  888     d88' d8(  888    888 . d8(  888  
 # o888bood8P'   `Y888""8o   "888" `Y888""8o 
+
+
+
+# do we imitate the poll behavior of the native tabs??
+# https://github.com/blender/blender/blob/main/source/blender/editors/space_buttons/
+# see buttons_context & buttons_context_path functions
+
+# def _poll_tool(context):
+#     return True
+
+# def _poll_render(context):
+#     return True
+
+# def _poll_output(context):
+#     return True
+
+# def _poll_viewlayer(context):
+#     return True
+
+# def _poll_scene(context):
+#     return True
+
+# def _poll_world(context):
+#     return True
+
+# def _poll_collection(context):
+#     return (context.collection!=context.scene.collection)
+
+# def _poll_object(context):
+#     return (context.active_object is not None)
+
+# def _poll_modifier(context):
+#     obj = context.active_object
+#     return _poll_object(context) and (obj.type in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'LATTICE', 'GREASEPENCIL','VOLUME',})
+
+# def _poll_shaderfx(context):
+#     obj = context.active_object
+#     return _poll_object(context) and (obj.type in {'GREASEPENCIL',})
+
+# def _poll_particles(context):
+#     obj = context.active_object
+#     return _poll_object(context) and (obj.type in {'MESH',})
+
+# def _poll_physics(context):
+#     return _poll_object(context)
+
+# def _poll_constraint(context):
+#     return _poll_object(context)
+
+# def _poll_data(context):
+#     return _poll_object(context)
+
+# def _poll_bone(context):
+#     return (context.active_bone is not None)
+
+# def _poll_bone_constraint(context):
+#     return _poll_bone(context)
+
+# def _poll_material(context):
+#     obj = context.active_object
+#     return _poll_object(context) and (obj.type in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'GREASEPENCIL','META', 'VOLUME'})
+
+# def _poll_texture(context):
+#     return True
+#     return (context.material or 
+#             (context.world and context.world.use_nodes) or 
+#             (context.light and context.light.use_nodes) or
+#             context.texture)
 
 # the native possible items
 NATIVE_ITEMS = [
@@ -289,14 +356,26 @@ def _generate_enumitems(context, space) -> list:
         return None
     if (space.type!='PROPERTIES'):
         return None
+    if not hasattr(space,'context'):
+        print(f"WARNING: space {space} has no 'context' attribute. This should never happen.\nFrom module instance: {__file__}")
+        return None
 
-    #We need to imitate the native behavior of space.context 
-    # so we fill the Enumitems with the compatible native entries, depending on context!
-    old_context = str(space.context)
+    # get the available tabs depending on the current context.
+    # Unfortunately, there's no way to get the context enum of the space.. 
+    # so we get it via the error message.. I don't like this.. but it works..
+    try: space.context = 'HEYDUDE'
+    except Exception as e:
+        # NOTE if blender developers change how the error message is generated, this will break.
+        msg = str(e) #ex: `bpy_struct: item.attr = val: enum "HEYDUDE" not found in ('TOOL', 'RENDER',)`
+        start = msg.find("not found in (") + 1
+        tuplestr = msg[start:-1]
+        tabs_available = set(tuplestr.replace("'","").replace(" ","").split(","))
+
+    # Generate enum items based on context polling rather than try-except
     r, i = [], 0
     for v in NATIVE_ITEMS:
 
-        #None are spacers
+        # None are spacers
         if (v is None):
             # we don't draw two spacers in a row!
             if (r and r[-1] is None):
@@ -304,16 +383,13 @@ def _generate_enumitems(context, space) -> list:
             r.append(None)
             continue
 
-        # TODO IMPORTANT to fix later.. 
-        # Lazy dirty solution to check if the items are available. We can't use this on the long term because this function is executing constantly.
-        # Unsure how to easily get what's available depending on context. Perhaps need to define conditions manually. i hope not..
-        try: space.context = v['id']
-        except:
-            continue
-
         uniqueid, icon, poll = v['id'], v['icon'], v['poll']
 
-        #support for tab poll functions
+        # filter out tabs that are not available in current context.
+        if (uniqueid not in tabs_available):
+            continue
+
+        # support for tab poll functions
         if (poll):
             try:
                 if (not poll(context)):
@@ -322,16 +398,13 @@ def _generate_enumitems(context, space) -> list:
                 print(f"WARNING: tab uniqueid '{uniqueid}' poll function failed!\n{e}\nFrom module instance: {__file__}")
                 continue
 
-        #icons of mesh data varies depending on active object.
+        # Icons of mesh data varies depending on active object
         if (icon=='*DATA_SPECIAL*'):
-            icon = _get_dataicon_fromcontext()
+            icon = _get_dataicon_fromcontext(context.active_object)
 
         r.append((uniqueid, v['name'], v['description'], icon, i))
         i += 1
         continue
-
-    #restore our try except bs trick above.
-    space.context = old_context
 
     #Fill our enum items with the added custom elements then!
     for v in _get_registry():
@@ -761,6 +834,14 @@ NATIVE_NAVDRAW = None
 def _reg_nav_impostors(regstatus:bool):
     """Monkey patching a blender draw function"""
 
+    #debug: compare behaviors of our vs native tabs
+    if (False):
+        def debugdraw(self, context):
+            layout = self.layout
+            layout.template_header()
+            layout.prop_tabs_enum(context.space_data, 'context', icon_only=True)
+        bpy.types.PROPERTIES_HT_header.draw = debugdraw
+        
     global NATIVE_NAVDRAW
     cls = bpy.types.PROPERTIES_PT_navigation_bar
 

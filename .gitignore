@@ -7,3 +7,4 @@ __pycache__
 *.ffs_db
 sync.ffs_lock
 .tm_properties
+*.mdc
