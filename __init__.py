@@ -10,7 +10,12 @@
 # - always use 'context.active_object' instead of 'context.object' in the Properties editor.
 
 import bpy
+import os
+import bpy.utils.previews
 from . import customtab #we import our customtab module. 
+
+# Example with plugin icons.
+ICONS = None
 
 # Example of your plugin panels
 
@@ -59,6 +64,12 @@ def register():
     # ...
     # for cls in classes:
     #     bpy.utils.register_class(cls)
+
+    # register your custom icon. might be best to use your own function.
+    global ICONS
+    ICONS = bpy.utils.previews.new()
+    icons_dir = os.path.join(os.path.dirname(__file__))
+    ICONS.load('myicon', os.path.join(icons_dir, "myicon.png"), 'IMAGE')
 
     #then we initialize the module
     customtab.register()
@@ -117,7 +128,7 @@ def register():
 
         row_right = row.row(align=True)
         row_right.alignment = 'RIGHT'
-        row_left.label(text='My Custom header!', icon='GHOST_ENABLED')
+        row_left.label(text='My Custom header!', icon_value=ICONS['myicon'].icon_id)
         row_left.label(text='', icon='RIGHTARROW')
         row_left.label(text='Data',)
 
@@ -127,7 +138,7 @@ def register():
     customtab.append_tab(
         uniqueid='SCARYGHOST',
         group='TOOLS', #we can also choose an existing group in ('TOOLS','SCENE','COLLECTION','OBJECT','TEXTURE',)
-        icon='GHOST_ENABLED',
+        icon=ICONS['myicon'].icon_id, #the 'icon' arguments accepts either a str icon identifier, or an int icon id.
         header=header_drawing,
         panels=(TEST_PT_1,TEST_PT_2,),
         )
@@ -139,6 +150,10 @@ def unregister():
 
     #we de-initialize our module first (order matter)
     customtab.unregister()
+    
+    # unregister your custom icon.. advised to use your own function.
+    global ICONS
+    bpy.utils.previews.remove(ICONS)
 
     # then we unregister our plugin 
     # ...

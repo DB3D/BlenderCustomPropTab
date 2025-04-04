@@ -45,6 +45,7 @@ DEBUG_MODE = False
 module_info = {
     'version':(0,9,1), #In beta. Need some work..
     'blender_version_min':(4,2,0),
+    'project_url':'https://github.com/DB3D/BlenderCustomPropTab/',
 }
 
 #################################################################################################################################
@@ -81,7 +82,6 @@ module_info = {
 # - Important: 
 #    - Fix the problem when swapping the active object. The tab might change, but not the enum active index.
 #      We could fix this with a context.active_object msgbus, perhaps. Or, we define precise poll behaviors of tabs; when polling changes, we act on the index.
-#    - Test if custom icon integer are working on panel as well. Might need a patch..
 # - Bonus:
 #    - What about panel search tab highlight? how to fix tab highlight?
 #    - Toggle_pin button. Custom solution? custom operator?
